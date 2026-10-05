@@ -1,0 +1,13 @@
+# скомпилированные файлы C++
+calculator_2.10/main
+*.o
+*.out
+
+# сборка LaTeX
+build/
+*.log
+*.aux
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz

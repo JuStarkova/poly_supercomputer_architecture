@@ -56,7 +56,7 @@ ping -c 2 10.0.2.10
 \end{lstlisting}
 
 Узлы уже были доступны по IP-адресам, а имена хостов
-разрешались через DNS. Однако, в файл \texttt{/etc/hosts} каждой машины добавлены
+разрешались через DNS. Однако в файл \texttt{/etc/hosts} каждой машины добавлены
 статические записи с соответствием имени и IP-адреса
 (листинг~\ref{lst:hosts}), чтобы разрешение имён не зависело
 от внешнего DNS-сервера.
@@ -118,7 +118,7 @@ firewall-cmd --list-services
 в единый кластер управления. Сервер, добавленный в пул, называется
 пиром (peer). Каждый узел пула хранит у себя идентификаторы UUID
 всех остальных узлов и обменивается с ними управляющими командами
-через службу \texttt{glusterd} (порт 24007). Управляющие команды
+через службу \texttt{glusterd}. Управляющие команды
 достаточно выполнить на одном узле пула: изменения конфигурации
 автоматически реплицируются на остальные узлы. С узла \texttt{node1}
 выполнено добавление \texttt{node2} в пул и проверка состояния
@@ -159,8 +159,7 @@ gluster peer status
 В распределённом (distributed) томе файлы размещаются по брикам
 целиком, без создания копий: очередной файл записывается на тот
 брик, который выбирается алгоритмом распределения. Объём тома равен
-сумме объёмов бриков, однако при отказе сервера файлы, размещённые
-на его брике, становятся недоступны.
+сумме объёмов бриков.
 
 На серверах созданы каталоги-брики (листинг~\ref{lst:dist-brick}).
 Флаг \texttt{-p} команды \texttt{mkdir} создаёт всю цепочку
@@ -182,8 +181,7 @@ mkdir -p /data/brick1/vdist
 хранилище (GlusterFS по умолчанию запрещает это и требует явного
 подтверждения). Параметр \texttt{replica} не указан, поэтому том
 создаётся распределённым. Команда \texttt{volume start} запускает
-том: на каждом сервере поднимается процесс-брик, и том становится
-доступен для монтирования. Команда \texttt{volume info} выводит
+том. Команда \texttt{volume info} выводит
 параметры тома: тип, состояние и список бриков.
 
 \begin{lstlisting}[caption={Создание и запуск тома vdist (node1)}, label={lst:dist-create}]
@@ -192,37 +190,32 @@ gluster volume start vdist
 gluster volume info vdist
 \end{lstlisting}
 
-Монтирование --- подключение файловой системы (локальной или
-удалённой) к дереву каталогов операционной системы: после монтирования
+Монтирование --- подключение файловой системы к дереву каталогов 
+операционной системы: после монтирования
 содержимое файловой системы становится доступно через указанный
-каталог-точку монтирования, как если бы это был обычный локальный
-диск. На клиенте \texttt{mgmt} том смонтирован по сети через модуль
-FUSE в каталог \texttt{/mnt/volume} (листинг~\ref{lst:dist-mount}).
+каталог --- точку монтирования. 
+На клиенте \texttt{mgmt} том смонтирован по сети через модуль
+FUSE в каталог \texttt{/mnt/vdist} (листинг~\ref{lst:dist-mount}).
 Разбор команды: \texttt{mount} --- утилита монтирования;
-\texttt{-t glusterfs} --- тип файловой системы: монтируется не
-локальный диск, а удалённый том GlusterFS;
+\texttt{-t glusterfs} --- тип файловой системы;
 \texttt{node1:/vdist} --- адрес тома: имя любого сервера пула и имя
-тома (клиент подключается к \texttt{node1}, а та направляет его
-к нужным брикам на обоих серверах);
-\texttt{/mnt/volume} --- точка монтирования. Команда \texttt{df -h}
+тома;
+\texttt{/mnt/vdist} --- точка монтирования. Команда \texttt{df -h}
 подтверждает монтирование: в колонке Filesystem появляется запись
 \texttt{node1:/vdist}.
 
 \begin{lstlisting}[caption={Монтирование тома на клиенте (mgmt)}, label={lst:dist-mount}]
-mkdir -p /mnt/volume
-mount -t glusterfs node1:/vdist /mnt/volume
-df -h /mnt/volume
+mkdir -p /mnt/vdist
+mount -t glusterfs node1:/vdist /mnt/vdist
+df -h /mnt/vdist
 \end{lstlisting}
 
 Для исследования размещения файлов на бриках с клиента записано
-шесть тестовых файлов (листинг~\ref{lst:dist-write}). Цикл
-последовательно создаёт файлы \texttt{file1.txt}--\texttt{file6.txt}
-содержимым «file N»; запись выполняется через смонтированный том,
-поэтому клиент не знает, на каком сервере физически окажется файл.
+шесть тестовых файлов (листинг~\ref{lst:dist-write}).
 
 \begin{lstlisting}[caption={Запись тестовых файлов (mgmt)}, label={lst:dist-write}]
-for i in 1 2 3 4 5 6; do echo "file $i" > /mnt/volume/file$i.txt; done
-ls -l /mnt/volume
+for i in 1 2 3 4 5 6; do echo "file $i" > /mnt/vdist/file$i.txt; done
+ls -l /mnt/vdist
 \end{lstlisting}
 
 Содержимое каталогов-бриков на обоих серверах представлено
@@ -254,46 +247,18 @@ ls -l /mnt/volume
 однако физически они разделены между серверами: на \texttt{node1}
 (рисунок~\ref{fig:dist-node1}) расположены file4.txt и file6.txt,
 на \texttt{node2} (рисунок~\ref{fig:dist-node2}) --- file1.txt,
-file2.txt, file3.txt и file5.txt. Каждый файл хранится целиком
-на одном брике, избыточность отсутствует: при отказе любого из
-серверов часть файлов тома станет недоступна.
+file2.txt, file3.txt и file5.txt. 
 
 \subsection{Том типа Replica}
 
 В реплицированном (replica) томе каждый файл хранится в полной копии
-на каждом брике реплик-группы. Объём тома равен объёму одного брика,
-а не сумме бриков: избыточность обеспечивает доступность данных при
-отказе любого из серверов, ценой двойного расхода дискового
-пространства. Параметр \texttt{replica 2} в команде создания означает,
-что в каждой группе репликации два брика, и каждый файл дублируется
-на оба.
+на каждом брике реплик-группы. Объём тома равен объёму одного брика.
+Избыточность обеспечивает доступность данных при
+отказе любого из серверов. 
 
-Для создания replica-тома распределённый том \texttt{vdist} удалён:
-выполнено отмонтирование на клиенте, остановка и удаление тома
-с узла \texttt{node1}, очистка каталогов-бриков на обоих серверах
-(листинг~\ref{lst:rep-delete}). Очистка обязательна: команда
-\texttt{volume delete} удаляет только описание тома, а в каталоге
-брика остаются служебный каталог \texttt{.glusterfs} и расширенные
-атрибуты; повторное использование такого каталога невозможно ---
-GlusterFS сообщит, что он \texttt{is already part of a volume}.
 
-\begin{lstlisting}[caption={Удаление тома vdist (mgmt, node1, node1 и node2)}, label={lst:rep-delete}]
-# mgmt
-umount /mnt/volume
-
-# node1
-gluster volume stop vdist
-gluster volume delete vdist
-
-# node1, node2
-rm -rf /data/brick1/vdist
-\end{lstlisting}
-
-После этого созданы новые брики и том \texttt{vrep} типа replica
-(листинг~\ref{lst:rep-create}). Команды \texttt{gluster} выполняются
-на одном узле пула: служба \texttt{glusterd} реплицирует изменения
-конфигурации на всех пиров, поэтому повторять их на \texttt{node2}
-не требуется.
+Созданы новые брики и том \texttt{vrep} типа replica
+(листинг~\ref{lst:rep-create}).
 
 \begin{lstlisting}[caption={Создание бриков (node1, node2)}, label={lst:rep-brick}]
 mkdir -p /data/brick1/vrep
@@ -308,17 +273,17 @@ gluster volume info vrep
 В выводе \texttt{volume info} для данного тома указывается
 \texttt{Type: Replicate} и \texttt{Number of Bricks: 1 x 2 = 2} ---
 одна группа репликации из двух бриков. Том смонтирован на клиенте
-в тот же каталог (листинг~\ref{lst:rep-mount}), после чего с клиента
-записаны те же шесть тестовых файлов (листинг~\ref{lst:rep-write}).
+в каталог \texttt{/mnt/vrep} (листинг~\ref{lst:rep-mount}), после чего с клиента
+записаны шесть тестовых файлов (листинг~\ref{lst:rep-write}).
 
 \begin{lstlisting}[caption={Монтирование тома на клиенте (mgmt)}, label={lst:rep-mount}]
-mount -t glusterfs node1:/vrep /mnt/volume
-df -h /mnt/volume
+mount -t glusterfs node1:/vrep /mnt/vrep
+df -h /mnt/vrep
 \end{lstlisting}
 
 \begin{lstlisting}[caption={Запись тестовых файлов (mgmt)}, label={lst:rep-write}]
-for i in 1 2 3 4 5 6; do echo "file $i" > /mnt/volume/file$i.txt; done
-ls -l /mnt/volume
+for i in 1 2 3 4 5 6; do echo "file $i" > /mnt/vrep/file$i.txt; done
+ls -l /mnt/vrep
 \end{lstlisting}
 
 Содержимое каталогов-бриков на серверах представлено на рисунках
@@ -338,10 +303,118 @@ ls -l /mnt/volume
     \label{fig:rep-node2}
 \end{figure}
 
-В отличие от распределённого тома, на обоих серверах присутствует
-полный набор файлов: file1.txt--file6.txt видны и на \texttt{node1},
-и на \texttt{node2}. Каждый файл хранится в двух полных копиях,
-поэтому отказ любого из серверов не приводит к потере данных.
+\subsection{Том типа Replica с арбитром}
+
+Том типа replica с арбитром содержит две полные копии данных и
+один брик-арбитр, хранящий только метаданные --- имена и атрибуты
+файлов. Арбитр позволяет кластеру разрешать конфликты при
+нарушении связности. В целях демонстрации на двух серверах
+брик арбитра размещён на \texttt{node1}.
+
+Созданы каталоги-брики (листинг~\ref{lst:arb-brick}): два брика
+с данными --- на обоих серверах, брик арбитра --- на \texttt{node1}.
+
+\begin{lstlisting}[caption={Создание бриков (node1, node2)}, label={lst:arb-brick}]
+# node1, node2
+mkdir -p /data/brick1/varb
+
+# node1
+mkdir -p /data/arb/varb
+\end{lstlisting}
+
+Создан и запущен том \texttt{varb} (листинг~\ref{lst:arb-create}).
+Параметры \texttt{replica 2 arbiter 1} задают группу репликации
+из двух бриков данных и одного брика-арбитра.
+
+\begin{lstlisting}[caption={Создание и запуск тома varb (node1)}, label={lst:arb-create}]
+gluster volume create varb replica 2 arbiter 1 \
+  node1:/data/brick1/varb node2:/data/brick1/varb node1:/data/arb/varb force
+gluster volume start varb
+gluster volume info varb
+\end{lstlisting}
+
+В выводе \texttt{volume info} для данного тома указывается
+\texttt{Type: Replicate} и \texttt{Number of Bricks: 1 x (2 + 1) = 3}
+--- одна группа репликации из двух бриков данных и одного брика
+арбитра, при этом третий брик помечен как \texttt{(arbiter)}.
+Том смонтирован на клиенте (листинг~\ref{lst:arb-mount}),
+после чего с клиента записаны три тестовых файла
+(листинг~\ref{lst:arb-write}).
+
+\begin{lstlisting}[caption={Монтирование тома на клиенте (mgmt)}, label={lst:arb-mount}]
+mkdir -p /mnt/varb
+mount -t glusterfs node1:/varb /mnt/varb
+df -h /mnt/varb
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Запись тестовых файлов (mgmt)}, label={lst:arb-write}]
+for i in 1 2 3; do echo "file $i" > /mnt/varb/file$i.txt; done
+ls -l /mnt/varb
+\end{lstlisting}
+
+Физическое размещение файлов: на бриках данных\\
+(\texttt{node1:/data/brick1/varb} и \texttt{node2:/data/brick1/varb})
+файлы имеют размер 7 байт (полное содержимое), а на брике-арбитре
+(\texttt{node1:/data/arb/varb}) --- те же файлы размером 0 байт.
+
+\subsection{Том типа Dispersed}
+
+Дисперсный (dispersed) том использует избыточное кодирование: 
+каждый файл разбивается на фрагменты данных и
+блоки чётности, которые распределяются по всем брикам
+дисперс-группы. Параметры \texttt{disperse 3 redundancy 1} задают
+группу из трёх бриков, из которых один хранит чётность: том
+переживает отказ любого одного брика при избыточности 1.5x
+(против 2x у реплики). Как и в случае арбитра, в целях
+демонстрации на двух серверах третий брик размещён на
+\texttt{node1} (параметр \texttt{force}).
+
+Созданы каталоги-брики (листинг~\ref{lst:disp-brick}).
+
+\begin{lstlisting}[caption={Создание бриков (node1, node2)}, label={lst:disp-brick}]
+# node1, node2
+mkdir -p /data/brick1/vdisp
+
+# node1
+mkdir -p /data/disp2/vdisp
+\end{lstlisting}
+
+Создан и запущен том \texttt{vdisp} (листинг~\ref{lst:disp-create}).
+
+\begin{lstlisting}[caption={Создание и запуск тома vdisp (node1)}, label={lst:disp-create}]
+gluster volume create vdisp disperse 3 redundancy 1 \
+  node1:/data/brick1/vdisp node2:/data/brick1/vdisp node1:/data/disp2/vdisp force
+gluster volume start vdisp
+gluster volume info vdisp
+\end{lstlisting}
+
+В выводе \texttt{volume info} указывается:
+\\\texttt{Type: Disperse},
+\\\texttt{Number of Bricks: 1 x 3 = 3}, 
+\\\texttt{Disperse-count: 3},
+\\\texttt{Redundancy-count: 1}. 
+\\Том смонтирован на клиенте
+(листинг~\ref{lst:disp-mount}), после чего с клиента записаны
+три тестовых файла (листинг~\ref{lst:disp-write}).
+
+\begin{lstlisting}[caption={Монтирование тома на клиенте (mgmt)}, label={lst:disp-mount}]
+mkdir -p /mnt/vdisp
+mount -t glusterfs node1:/vdisp /mnt/vdisp
+df -h /mnt/vdisp
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Запись тестовых файлов (mgmt)}, label={lst:disp-write}]
+for i in 1 2 3; do echo "file $i" > /mnt/vdisp/file$i.txt; done
+ls -l /mnt/vdisp
+\end{lstlisting}
+
+Физическое размещение файлов: на каждом из трёх бриков
+находятся фрагменты всех трёх файлов размером 512 байт ---
+это размер блока избыточного кодирования. Файл не хранится
+целиком ни на одном брике, в отличие от распределённого тома и реплицированного.
+При чтении через смонтированный том
+клиент видит файлы исходного размера 7 байт --- GlusterFS
+автоматически собирает файл из фрагментов.
 
 \subsection{Квоты}
 
@@ -349,18 +422,23 @@ ls -l /mnt/volume
 в том целиком или в отдельном каталоге тома. GlusterFS поддерживает
 жёсткий лимит (hard limit), при достижении которого запись
 запрещается, и мягкий лимит (soft limit), по умолчанию равный
-80\% от жёсткого, при достижении которого начинается отсрочка
-проверки. Квоты работают на томе \texttt{vrep}.
+80\% от жёсткого. Квоты работают на томе \texttt{vrep}.
 
-Сначала на клиенте создан каталог, на который будет назначен лимит,
-затем на узле \texttt{node1} включён механизм квот и установлен
-лимит 10 МБ на каталог \texttt{/project}
-(листинг~\ref{lst:quota-set}). Путь в команде указывается
-относительно корня тома.
+Том \texttt{vrep} предварительно смонтирован на клиенте
+(листинг~\ref{lst:quota-mount}).
+
+\begin{lstlisting}[caption={Монтирование тома vrep на клиенте (mgmt)}, label={lst:quota-mount}]
+mount -t glusterfs node1:/vrep /mnt/vrep
+df -h /mnt/vrep
+\end{lstlisting}
+
+После этого на клиенте создан каталог, на который назначен лимит,
+а на узле \texttt{node1} включён механизм квот и установлен лимит
+10 МБ на каталог \texttt{/project} (листинг~\ref{lst:quota-set}).
 
 \begin{lstlisting}[caption={Включение квот и установка лимита (mgmt, node1)}, label={lst:quota-set}]
 # mgmt
-mkdir -p /mnt/volume/project
+mkdir -p /mnt/vrep/project
 
 # node1
 gluster volume quota vrep enable
@@ -380,32 +458,24 @@ gluster volume quota vrep hard-timeout 0
 так как суммарный объём превысил бы 10 МБ.
 
 \begin{lstlisting}[caption={Проверка квоты (mgmt)}, label={lst:quota-test}]
-dd if=/dev/zero of=/mnt/volume/project/f1 bs=1M count=5
-dd if=/dev/zero of=/mnt/volume/project/f2 bs=1M count=8
+dd if=/dev/zero of=/mnt/vrep/project/f1 bs=1M count=5
+dd if=/dev/zero of=/mnt/vrep/project/f2 bs=1M count=8
 \end{lstlisting}
 
-Результат записи файлов и статистика квот представлены на рисунках
-\ref{fig:quota-dd} и \ref{fig:quota-list}.
+Результат записи файлов:
+первая команда завершилась успешно, вторая оборвалась ошибкой
+\texttt{Disk quota exceeded}.
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/quota_dd.png}
-    \caption{Проверка квоты на клиенте}
-    \label{fig:quota-dd}
-\end{figure}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1.1\textwidth]{images/quota_list.png}
-    \caption{Статистика квот}
-    \label{fig:quota-list}
-\end{figure}
-
-В статистике (рисунок~\ref{fig:quota-list}) видно, что каталог
+Статистика квот (листинг~\ref{lst:quota-list}) показывает, что каталог
 \texttt{/project} занял 10.0 МБ из разрешённых 10.0 МБ, лимит
 превышен (\texttt{Hard exceeded? Yes}), доступный объём --- 0 байт.
-Запись дополнительных данных в каталог невозможна до освобождения
-места или изменения лимита.
+
+
+\begin{lstlisting}[caption={Статистика квот (node1)}, label={lst:quota-list}]
+gluster volume quota vrep list
+\end{lstlisting}
+
 
 \subsection{Снимки}
 
@@ -417,13 +487,12 @@ dd if=/dev/zero of=/mnt/volume/project/f2 bs=1M count=8
 брики тома должны размещаться на тонких логических томах LVM,
 а не в каталоге корневой файловой системы.
 
-На серверах к машинам добавлены виртуальные диски объёмом 4 ГБ.
-На каждом сервере создан физический том, группа томов \texttt{bricks},
-тонкий пул \texttt{pool0} и тонкий том \texttt{snapbrick} объёмом 2 ГБ
-с файловой системой XFS, смонтированный в \texttt{/bricks/snap}
-(листинг~\ref{lst:thin-lvm}). Подтверждение --- вывод \texttt{lvs}
-на рисунке~\ref{fig:thin-lvm}: пул типа \texttt{twi} (thin pool)
-и том типа \texttt{Vwi} (thin volume).
+На серверы добавлены виртуальные диски объёмом 4 ГБ. На каждом
+сервере создан физический том, группа томов \texttt{bricks},
+тонкий пул \texttt{pool0} и тонкий том \texttt{snapbrick} объёмом
+2 ГБ с файловой системой XFS (листинг~\ref{lst:thin-lvm}). 
+Для автоматического монтирования
+после перезагрузки в файл \texttt{/etc/fstab} добавлена запись.
 
 \begin{lstlisting}[caption={Развертывание thin LVM (node1, node2)}, label={lst:thin-lvm}]
 pvcreate /dev/sdb
@@ -431,49 +500,60 @@ vgcreate bricks /dev/sdb
 lvcreate --type thin-pool --name pool0 --extents 100%FREE bricks
 lvcreate --type thin --name snapbrick --virtualsize 2G --thinpool bricks/pool0
 mkfs.xfs /dev/bricks/snapbrick
-mkdir -p /bricks/snap
-mount /dev/bricks/snapbrick /bricks/snap
-mkdir -p /bricks/snap/brick
+mkdir -p /data/lvm1
+mount /dev/bricks/snapbrick /data/lvm1
+echo '/dev/bricks/snapbrick /data/lvm1 xfs defaults 0 0' >> /etc/fstab
 \end{lstlisting}
 
-% \begin{figure}[h]
-%     \centering
-%     \includegraphics[width=0.8\textwidth]{images/thin_lvm.png}
-%     \caption{Тонкие тома LVM на node1}
-%     \label{fig:thin-lvm}
-% \end{figure}
+На бриках тонкого тома создан и запущен том \texttt{snapvol},
+который смонтирован на клиенте (листинг~\ref{lst:snapvol}).
+Параметр \texttt{force} здесь не требуется --- брики размещены
+на отдельной файловой системе.
 
-На бриках тонкого тома создан и запущен том \texttt{snapvol}
-(листинг~\ref{lst:snapvol}). Параметр \texttt{force} здесь не
-требуется --- брики размещены на отдельной файловой системе.
+\begin{lstlisting}[caption={Создание тома snapvol и монтирование (node1, node2, mgmt)}, label={lst:snapvol}]
+# node1, node2
+mkdir -p /data/lvm1/snapvol
 
-\begin{lstlisting}[caption={Создание тома snapvol (node1)}, label={lst:snapvol}]
-gluster volume create snapvol node1:/bricks/snap/brick node2:/bricks/snap/brick
+# node1
+gluster volume create snapvol node1:/data/lvm1/snapvol node2:/data/lvm1/snapvol
 gluster volume start snapvol
+
+# mgmt
+mkdir -p /mnt/snapvol
+mount -t glusterfs node1:/snapvol /mnt/snapvol
 \end{lstlisting}
 
-Далее на клиенте том смонтирован в \texttt{/mnt/snapvol}, создан файл
-\texttt{doc.txt} с содержимым «version 1» --- это состояние «до».
-С узла \texttt{node1} выполнено создание снимка \texttt{snap1}
-(листинг~\ref{lst:snap-create}). Флаг \texttt{no-timestamp} запрещает
-добавление даты к имени снимка. После создания снимка файл изменён
-(«version 2») и добавлен файл \texttt{new.txt} --- это состояние
-«после».
+Создан файл \texttt{doc.txt} с содержимым «version 1» --- состояние
+«до» (листинг~\ref{lst:snap-before}). С узла \texttt{node1}
+выполнено создание снимка \texttt{snap1}; флаг \texttt{no-timestamp}
+запрещает добавление даты к имени снимка
+(листинг~\ref{lst:snap-create}).
+
+\begin{lstlisting}[caption={Состояние "до" (mgmt)}, label={lst:snap-before}]
+echo "version 1" > /mnt/snapvol/doc.txt
+cat /mnt/snapvol/doc.txt
+\end{lstlisting}
 
 \begin{lstlisting}[caption={Создание снимка (node1)}, label={lst:snap-create}]
 gluster snapshot create snap1 snapvol no-timestamp
 gluster snapshot list
 \end{lstlisting}
 
-\begin{lstlisting}[caption={Изменение данных после снимка (mgmt)}, label={lst:snap-change}]
+После создания снимка файл изменён («version 2») и добавлен файл
+\texttt{new.txt} --- состояние «после»
+(листинг~\ref{lst:snap-change}).
+
+\begin{lstlisting}[caption={Состояние "после" (mgmt)}, label={lst:snap-change}]
 echo "version 2" > /mnt/snapvol/doc.txt
-echo "newFile" > /mnt/snapvol/new.txt
+echo "new file" > /mnt/snapvol/new.txt
+ls -l /mnt/snapvol
 \end{lstlisting}
 
 Для просмотра снимка он активирован на \texttt{node1}, после чего
-на клиенте смонтирован по специальному пути \texttt{node1:/snaps/snap1/snapvol}
-в каталог \texttt{/mnt/snap1} (листинг~\ref{lst:snap-activate}).
-Снимок доступен только для чтения.
+на клиенте смонтирован по специальному пути
+\texttt{node1:/snaps/snap1/snapvol} в каталог \texttt{/mnt/snap1}
+(листинг~\ref{lst:snap-activate}). Снимок доступен только
+для чтения.
 
 \begin{lstlisting}[caption={Активация и монтирование снимка (node1, mgmt)}, label={lst:snap-activate}]
 # node1
@@ -484,40 +564,79 @@ mkdir -p /mnt/snap1
 mount -t glusterfs node1:/snaps/snap1/snapvol /mnt/snap1
 \end{lstlisting}
 
-Сравнение содержимого живого тома и снимка представлено
-на рисунке~\ref{fig:snap-compare}: в живом томе \texttt{doc.txt}
-содержит «version 2», в снимке --- «version 1»; файл \texttt{new.txt}
-в снимке отсутствует. Снимок фиксирует состояние данных
-на момент его создания.
+Сравнение содержимого живого тома и снимка
+(листинг~\ref{lst:snap-compare}): в живом томе \texttt{doc.txt}
+содержит «version 2», в снимке --- «version 1»; файл
+\texttt{new.txt} в снимке отсутствует. Снимок фиксирует
+состояние данных на момент его создания.
 
-% \begin{figure}[h]
-%     \centering
-%     \includegraphics[width=0.8\textwidth]{images/snap_compare.png}
-%     \caption{Сравнение живого тома и снимка}
-%     \label{fig:snap-compare}
-% \end{figure}
+\begin{lstlisting}[caption={Сравнение живого тома и снимка (mgmt)}, label={lst:snap-compare}]
+cat /mnt/snapvol/doc.txt     # version 2
+cat /mnt/snap1/doc.txt       # version 1
+ls /mnt/snap1                # no new.txt 
+\end{lstlisting}
 
-Для восстановления том остановлен, выполнен откат к снимку
-и том запущен заново (листинг~\ref{lst:snap-restore}).
-Команда \texttt{snapshot restore} заменяет текущее состояние тома
+Для восстановления на клиенте отмонтированы снимок и том, после
+чего на \texttt{node1} выполнены остановка тома, откат к снимку
+и повторный запуск (листинг~\ref{lst:snap-restore}). Команда
+\texttt{snapshot restore} заменяет текущее состояние тома
 состоянием снимка: все изменения, выполненные после создания
 снимка, утрачиваются.
 
-\begin{lstlisting}[caption={Восстановление тома из снимка (node1)}, label={lst:snap-restore}]
+\begin{lstlisting}[caption={Восстановление тома из снимка (mgmt, node1)}, label={lst:snap-restore}]
+# mgmt
+umount /mnt/snap1
+umount /mnt/snapvol
+
+# node1
 gluster volume stop snapvol
 gluster snapshot restore snap1
 gluster volume start snapvol
+
+# mgmt
+mount -t glusterfs node1:/snapvol /mnt/snapvol
 \end{lstlisting}
 
-Результат восстановления представлен на рисунке~\ref{fig:snap-restore}:
-файл \texttt{doc.txt} вернулся к содержимому «version 1»,
-файл \texttt{new.txt} исчез, а использованный снимок автоматически
-удалён --- команда \texttt{gluster snapshot list} сообщает
-\texttt{No snapshots present}.
+Результат восстановления представлен в
+листинге~\ref{lst:snap-verify}: файл \texttt{doc.txt} вернулся
+к содержимому «version 1», файл \texttt{new.txt} исчез,
+а использованный снимок автоматически удалён --- команда
+\texttt{gluster snapshot list} сообщает \texttt{No snapshots
+present}.
 
-% \begin{figure}[h]
-%     \centering
-%     \includegraphics[width=0.8\textwidth]{images/snap_restore.png}
-%     \caption{Результат восстановления из снимка}
-%     \label{fig:snap-restore}
-% \end{figure}
+\begin{lstlisting}[caption={Проверка результата восстановления (mgmt, node1)}, label={lst:snap-verify}]
+# mgmt
+cat /mnt/snapvol/doc.txt     # version 1
+ls /mnt/snapvol              # no new.txt 
+
+# node1
+gluster snapshot list        # No snapshots present
+\end{lstlisting}
+
+\subsection{Удаление тома}
+
+Удаление тома выполняется в строгом порядке: отмонтирование тома
+на клиенте, остановка тома, удаление тома из кластера и очистка
+каталогов-бриков на серверах (листинг~\ref{lst:vol-delete}).
+Очистка каталогов обязательна: команда \texttt{volume delete}
+удаляет только описание тома из конфигурации кластера, а в каталоге
+брика остаются служебный каталог \texttt{.glusterfs} и расширенные
+атрибуты; повторное использование такого каталога невозможно ---
+GlusterFS сообщит, что он \texttt{is already part of a volume}.
+Порядок удаления продемонстрирован на томе \texttt{vdist}.
+
+\begin{lstlisting}[caption={Удаление тома vdist (mgmt, node1, node1 и node2)}, label={lst:vol-delete}]
+# mgmt
+umount /mnt/vdist
+
+# node1
+gluster volume stop vdist
+gluster volume delete vdist
+gluster volume list
+
+# node1, node2
+rm -rf /data/brick1/vdist
+\end{lstlisting}
+
+После выполнения команд том \texttt{vdist} исчезает из вывода
+\texttt{gluster volume list}, каталоги-брики на серверах очищены.
